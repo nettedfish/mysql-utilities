@@ -50,6 +50,7 @@ from mysql.utilities.common.options import (add_failover_options,
 
 
 # Constants
+# 标准的常量都使用大写字母
 NAME = "MySQL Utilities - mysqlfailover "
 DESCRIPTION = ("mysqlfailover - automatic replication health monitoring and "
                "failover")
@@ -185,6 +186,7 @@ if __name__ == '__main__':
                       choices=("start", "stop", "restart", "nodetach"))
 
     # Add pidfile for the daemon option
+    # mysqlfailover本身可以以daemon方式运行 这样就可以实现多实例监控了
     parser.add_option("--pidfile", action="store", dest="pidfile",
                       type="string", default=None,
                       help="pidfile for running mysqlfailover as a daemon.")
@@ -218,6 +220,7 @@ if __name__ == '__main__':
 
     # Check for errors
     if int(opt.interval) < 5:
+        # 也就是说 最坏的情况下 会在5秒内发现问题
         parser.error("The --interval option requires a value greater than or "
                      "equal to 5.")
 
@@ -233,10 +236,12 @@ if __name__ == '__main__':
     if opt.master is None and opt.daemon != "stop":
         parser.error("You must specify a master to monitor.")
 
+    # 需要自己选择候选的slave 可能带来运维上的负担
     if opt.slaves is None and opt.discover is None and opt.daemon != "stop":
         parser.error("You must supply a list of slaves or the "
                      "--discover-slaves-login option.")
 
+    # 如果是选举的话 则需要候选对象
     if opt.failover_mode == 'elect' and opt.candidates is None:
         parser.error("Failover mode = 'elect' requires at least one "
                      "candidate.")
@@ -246,11 +251,13 @@ if __name__ == '__main__':
         master_val, slaves_val, candidates_val = parse_topology_connections(
             opt)
     except UtilRplError:
+        # 这种记录错误日志的方法是非常好的
         _, e, _ = sys.exc_info()
         print("ERROR: {0}".format(e.errmsg))
         sys.exit(1)
 
     # Check hostname alias
+    # master与slave不能是用一个 candidate也不能是同一个
     for slave_val in slaves_val:
         if check_hostname_alias(master_val, slave_val):
             parser.error("The master and one of the slaves are the same "
@@ -292,7 +299,9 @@ if __name__ == '__main__':
         parser.error("Error purging log file.")
 
     # Setup log file
-    logging.basicConfig(filename=opt.log_file, level=logging.INFO,
+    # 在哪里打印日志 这里一般会配置打印日志到日志文件
+    # 为了调试的方便 我把日志级别设置为DEBUG
+    logging.basicConfig(filename=opt.log_file, level=logging.DEBUG,
                         format='%(asctime)s %(levelname)s %(message)s',
                         datefmt=_DATE_FORMAT)
 
@@ -335,6 +344,7 @@ if __name__ == '__main__':
                     parser.error("pidfile {0} already exists. The daemon is "
                                  "already running?".format(pidfile))
                 # Test if pidfile is writable
+                # 这个测试方法也很巧妙 如果无法写成功 则通过异常通报出来 解析失败
                 try:
                     with open(pidfile, "w") as f:
                         f.write("{0}\n".format(0))
@@ -352,11 +362,13 @@ if __name__ == '__main__':
                             pidfile))
                     with open(pidfile, "r") as f:
                         pid = int(f.read().strip())
+                # 这些处理方法也很巧妙 最后通过判断pid是否为空来判断
                 except IOError:
                     pid = None
                 except ValueError:
                     pid = None
                 # Test pid presence
+                # 如果pid没有定义 则报告失败
                 if not pid:
                     parser.error("Can not read pid from pidfile.")
 
@@ -364,6 +376,7 @@ if __name__ == '__main__':
         parser.error("The option --daemon is required when using --pidfile.")
 
     # Log MySQL Utilities version string
+    # 如果配置了日志文件则记录下版本信息
     if opt.log_file:
         logging.info(MSG_UTILITIES_VERSION.format(utility=program,
                                                   version=VERSION_STRING))
